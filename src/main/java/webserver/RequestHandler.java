@@ -36,7 +36,6 @@ public class RequestHandler extends Thread {
 
         try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream()) {
 
-            // TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
             BufferedReader br = new BufferedReader(new InputStreamReader(in, "UTF-8"));
             String line = br.readLine();
             log.debug("request line: {}", line); // GET /index.html HTTP/1.1
@@ -46,11 +45,12 @@ public class RequestHandler extends Thread {
             }
 
             String[] tokens = line.split(" ");
+            boolean logined = false;
             int contentLength = 0;
 
             while (!line.equals("")) {
-                line = br.readLine();
                 log.debug("header: {}", line);
+                line = br.readLine();
                 if (line.contains("Content-Length")) {
                     contentLength = getContentLength(line);
                 }
@@ -188,4 +188,10 @@ public class RequestHandler extends Thread {
  * 기 회원가입한 사용자로 로그인 가능해야 함
  * 로그인 성공 시 로그인 상태 유지 필요
  * 로그인 성공 시 요청 헤더의 Cookie 헤더 값이 logined=true, 로그인 실패 시 logined=false 로 전달
+ */
+
+/**
+ * 요구사항 #6 - 사용자 목록 출력
+ * 접근하고 있는 사용자가 "로그인" 상태일 경우(Cookie 값이 logined=true) http://localhost:8080/user/list 로 접근했을 때 사용자 목록을 출력
+ * 만약 로그인 하지 않은 상태라면 로그인 페이지(login.html) 로 이동
  */
