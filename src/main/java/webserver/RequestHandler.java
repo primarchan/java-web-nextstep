@@ -9,6 +9,7 @@ import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import util.HttpRequestUtils;
+import util.IOUtils;
 
 /**
  * RequestHandler 클래스는 Thread 를 상속하고 있으며, 사용자 요청에 대한 처리와 응답에 대한 처리를 담당하는 가장 중심이 되는 클래스
@@ -42,19 +43,36 @@ public class RequestHandler extends Thread {
             }
 
             String[] tokens = line.split(" ");
+            int contentLength = 0;
 
             while (!line.equals("")) {
                 line = br.readLine();
                 log.debug("header: {}", line);
+                if (line.contains("Content-Length")) {
+                    contentLength = getContentLength(line);
+                }
             }
 
             String url = tokens[1];
-            if (url.startsWith("/user/create")) {
+
+            // POST 요청 시
+            if ("/user/create".equals(url)) {
+                String body = IOUtils.readData(br, contentLength);
+                Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+                log.debug("params: {}", params);
+                User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
+                log.debug("post user: {}", user);
+
+                // 회원가입 요청(/user/craete)을 완료한 후 URL 요청 값을 "/index.html" 로 변경
+                url = "/index.html";
+            }
+            // Get 요청 시
+            if (url.startsWith("/user/create?")) {
                 int index = url.indexOf("?");
                 String queryString = url.substring(index + 1);
                 Map<String, String> params = HttpRequestUtils.parseQueryString(queryString);
                 User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
-                log.debug("user: {}", user);
+                log.debug("get user: {}", user);
             } else {
                 DataOutputStream dos = new DataOutputStream(out);
                 // byte[] body = "Hello World".getBytes();
@@ -65,6 +83,11 @@ public class RequestHandler extends Thread {
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+    }
+
+    private int getContentLength(String line) {
+        String[] headerTokens = line.split(":");
+        return Integer.parseInt(headerTokens[1].trim());
     }
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
@@ -104,4 +127,12 @@ public class RequestHandler extends Thread {
 /**
  * 요구사항 #3 - POST 방식으로 회원가입하기
  * http://localhost:8080/user/form.html 파일의 form 태그 method 를 get 에서 post 로 수정한 후 회원가입이 정상적으로 동작하도록 구현
+ */
+
+/**
+ * 요구사항 #4 - 302 status code 적용
+ * "회원가입"을 완료하면 /index.html 페이지로 이동
+ * 현재는 URL 이 /user/create 로 유지되는 상태로 읽어서 전달할 파일이 없음
+ * 따라서 회원가입을 완료한 후 /index.html 페이지로 이동
+ * 브라우저 URL 도 /user/create 가 아니라 /index.html로 변경 필요
  */
