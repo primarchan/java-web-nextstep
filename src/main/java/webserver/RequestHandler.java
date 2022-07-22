@@ -5,11 +5,14 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.util.Map;
 
+import db.DataBase;
 import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import util.HttpRequestUtils;
 import util.IOUtils;
+
+import javax.xml.crypto.Data;
 
 /**
  * RequestHandler 클래스는 Thread 를 상속하고 있으며, 사용자 요청에 대한 처리와 응답에 대한 처리를 담당하는 가장 중심이 되는 클래스
@@ -56,17 +59,37 @@ public class RequestHandler extends Thread {
             String url = tokens[1];
 
             // POST 요청 시
-            if ("/user/create".equals(url)) {
+            if (url.equals("/user/create")) {
                 String body = IOUtils.readData(br, contentLength);
                 Map<String, String> params = HttpRequestUtils.parseQueryString(body);
                 log.debug("params: {}", params);
                 User user = new User(params.get("userId"), params.get("password"), params.get("name"), params.get("email"));
                 log.debug("post user: {}", user);
-
-                // 회원가입 요청(/user/craete)을 완료한 후 URL 요청 값을 "/index.html" 로 변경
-                url = "/index.html";
+                DataOutputStream dos = new DataOutputStream(out);
+                response302LoginSuccessHeader(dos);
+                DataBase.addUser(user);
+                // url = "/index.html"; -> 회원가입 요청(/user/craete)을 완료한 후 URL 요청 값을 "/index.html" 로 변경하면 새로고침 시 이전 요청이 재전송되는 이슈 발생
+            } else if ("/user/login".equals(url)) {
+                String body = IOUtils.readData(br, contentLength);
+                Map<String, String> params = HttpRequestUtils.parseQueryString(body);
+                log.debug("params: {}", params);
+                User user = DataBase.findUserById(params.get("userId"));
+                if (user == null) {
+                    responseResource(out, "/user/login_failed.html");
+                    return;
+                }
+                if (user.getPassword().equals(params.get("password"))) {
+                    DataOutputStream dos = new DataOutputStream(out);
+                    response302LoginSuccessHeader(dos);
+                } else {
+                    responseResource(out, "/user/login_failed.html");
+                }
+            } else {
+                responseResource(out, url);
             }
+
             // Get 요청 시
+            /*
             if (url.startsWith("/user/create?")) {
                 int index = url.indexOf("?");
                 String queryString = url.substring(index + 1);
@@ -80,15 +103,12 @@ public class RequestHandler extends Thread {
                 response200Header(dos, body.length);
                 responseBody(dos, body);
             }
+             */
         } catch (IOException e) {
             log.error(e.getMessage());
         }
     }
 
-    private int getContentLength(String line) {
-        String[] headerTokens = line.split(":");
-        return Integer.parseInt(headerTokens[1].trim());
-    }
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
         try {
@@ -101,6 +121,24 @@ public class RequestHandler extends Thread {
         }
     }
 
+    private void response302LoginSuccessHeader(DataOutputStream dos) {
+        try {
+            dos.writeBytes("HTTP/1.1 302 Redirect \r\n");
+            dos.writeBytes("Set-Cookie: logined=true \r\n");
+            dos.writeBytes("Location: /index.html \r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void responseResource(OutputStream out, String url) throws IOException {
+        DataOutputStream dos = new DataOutputStream(out);
+        byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
+        response200Header(dos, body.length);
+        responseBody(dos, body);
+    }
+
     private void responseBody(DataOutputStream dos, byte[] body) {
         try {
             dos.write(body, 0, body.length);
@@ -109,6 +147,12 @@ public class RequestHandler extends Thread {
             log.error(e.getMessage());
         }
     }
+
+    private int getContentLength(String line) {
+        String[] headerTokens = line.split(":");
+        return Integer.parseInt(headerTokens[1].trim());
+    }
+
 }
 
 /**
@@ -135,4 +179,13 @@ public class RequestHandler extends Thread {
  * 현재는 URL 이 /user/create 로 유지되는 상태로 읽어서 전달할 파일이 없음
  * 따라서 회원가입을 완료한 후 /index.html 페이지로 이동
  * 브라우저 URL 도 /user/create 가 아니라 /index.html로 변경 필요
+ */
+
+/**
+ * 요구사항 #5 - 로그인 하기
+ * "로그인" 메뉴를 클릭하면 http://localhost:8080/user/login.html 로 이동해 로그인 가능
+ * 로그인 성공 시 "/index.html" 로 이동, 로그인 실패 시 "/login_failed.html"로 이동
+ * 기 회원가입한 사용자로 로그인 가능해야 함
+ * 로그인 성공 시 로그인 상태 유지 필요
+ * 로그인 성공 시 요청 헤더의 Cookie 헤더 값이 logined=true, 로그인 실패 시 logined=false 로 전달
  */
