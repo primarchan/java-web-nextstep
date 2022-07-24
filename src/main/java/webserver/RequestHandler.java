@@ -3,6 +3,7 @@ package webserver;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.Map;
 
 import db.DataBase;
@@ -51,6 +52,9 @@ public class RequestHandler extends Thread {
             while (!line.equals("")) {
                 log.debug("header: {}", line);
                 line = br.readLine();
+                if (line.contains("Cookie")) {
+                    logined = isLogin(line);
+                }
                 if (line.contains("Content-Length")) {
                     contentLength = getContentLength(line);
                 }
@@ -59,7 +63,7 @@ public class RequestHandler extends Thread {
             String url = tokens[1];
 
             // POST 요청 시
-            if (url.equals("/user/create")) {
+            if ("/user/create".equals(url)) {
                 String body = IOUtils.readData(br, contentLength);
                 Map<String, String> params = HttpRequestUtils.parseQueryString(body);
                 log.debug("params: {}", params);
@@ -84,6 +88,26 @@ public class RequestHandler extends Thread {
                 } else {
                     responseResource(out, "/user/login_failed.html");
                 }
+            } else if ("/user/list".equals(url)) {
+                if (!logined) {
+                    responseResource(out, "/user/login.html");
+                    return;
+                }
+                Collection<User> users = DataBase.findAll();
+                StringBuilder sb = new StringBuilder();
+                sb.append("<table border='1'>");
+                for (User user : users) {
+                    sb.append("<tr>");
+                    sb.append("<td>" + user.getUserId() + "</td>");
+                    sb.append("<td>" + user.getName() + "</td>");
+                    sb.append("<td>" + user.getEmail() + "</td>");
+                    sb.append("</tr>");
+                }
+                sb.append("</table>");
+                byte[] body = sb.toString().getBytes();
+                DataOutputStream dos = new DataOutputStream(out);
+                response200Header(dos, body.length);
+                responseBody(dos, body);
             } else {
                 responseResource(out, url);
             }
@@ -151,6 +175,16 @@ public class RequestHandler extends Thread {
     private int getContentLength(String line) {
         String[] headerTokens = line.split(":");
         return Integer.parseInt(headerTokens[1].trim());
+    }
+
+    private boolean isLogin(String line) {
+        String[] headerTokens = line.split(":");
+        Map<String, String> cookies = HttpRequestUtils.parseCookies(headerTokens[1].trim());
+        String value = cookies.get("logined");
+        if (value == null) {
+            return false;
+        }
+        return Boolean.parseBoolean(value);
     }
 
 }
