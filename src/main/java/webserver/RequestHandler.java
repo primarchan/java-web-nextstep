@@ -108,6 +108,11 @@ public class RequestHandler extends Thread {
                 DataOutputStream dos = new DataOutputStream(out);
                 response200Header(dos, body.length);
                 responseBody(dos, body);
+            } else if (url.endsWith(".css")) {
+                DataOutputStream dos = new DataOutputStream(out);
+                byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
+                response200CssHeader(dos, body.length);
+                responseBody(dos, body);
             } else {
                 responseResource(out, url);
             }
@@ -138,6 +143,17 @@ public class RequestHandler extends Thread {
         try {
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
             dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response200CssHeader(DataOutputStream dos, int lengthOfBodyContent) {
+        try {
+            dos.writeBytes("HTTP/1.1 200 OK \r\n");
+            dos.writeBytes("Content-Type: text/css \r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
@@ -228,4 +244,10 @@ public class RequestHandler extends Thread {
  * 요구사항 #6 - 사용자 목록 출력
  * 접근하고 있는 사용자가 "로그인" 상태일 경우(Cookie 값이 logined=true) http://localhost:8080/user/list 로 접근했을 때 사용자 목록을 출력
  * 만약 로그인 하지 않은 상태라면 로그인 페이지(login.html) 로 이동
+ */
+
+/**
+ * 요구사항 #7 - CSS 지원하기
+ * 지금까지 구현한 소스코드는 CSS 파일을 지원하지 못하고 있음
+ * CSS 파일을 지원하도록 구현
  */
