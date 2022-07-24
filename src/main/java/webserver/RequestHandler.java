@@ -248,6 +248,5 @@ public class RequestHandler extends Thread {
 
 /**
  * 요구사항 #7 - CSS 지원하기
- * 지금까지 구현한 소스코드는 CSS 파일을 지원하지 못하고 있음
- * CSS 파일을 지원하도록 구현
+ * 지금까지 구현한 소스코드는 CSS 파일을 지원하지 못하고 있음 -> CSS 파일을 지원하도록 구현
  */
